@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Management Chatbot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 800px;
+            height: 80vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .chat-header h1 {
+            font-size: 1.8em;
+            margin-bottom: 5px;
+        }
+
+        .chat-header p {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            border-radius: 18px;
+            max-width: 80%;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .user-message {
+            background: #007bff;
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+        }
+
+        .bot-message {
+            background: white;
+            color: #333;
+            border: 1px solid #e9ecef;
+            margin-right: auto;
+            border-bottom-left-radius: 5px;
+        }
+
+        .chat-input {
+            display: flex;
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .chat-input input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 25px;
+            outline: none;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .chat-input input:focus {
+            border-color: #4facfe;
+        }
+
+        .chat-input button {
+            margin-left: 10px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .chat-input button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
+        }
+
+        .chat-input button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .typing-indicator {
+            display: none;
+            padding: 12px 16px;
+            background: white;
+            color: #666;
+            border-radius: 18px;
+            margin-bottom: 15px;
+            margin-right: auto;
+            border: 1px solid #e9ecef;
+            border-bottom-left-radius: 5px;
+        }
+
+        .typing-indicator span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #666;
+            border-radius: 50%;
+            margin: 0 2px;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-indicator span:nth-child(1) { animation-delay: 0s; }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-5px); }
+        }
+
+        .welcome-message {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>🤖 Task Management Chatbot</h1>
+            <p>Manage your tasks with natural language</p>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+            <div class="welcome-message">
+                Hello! I'm your task management assistant. <br>
+                Try saying: "Add task: Buy groceries" or "Show my tasks"
+            </div>
+        </div>
+
+        <div class="typing-indicator" id="typingIndicator">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+
+        <div class="chat-input">
+            <input type="text" id="messageInput" placeholder="Type your command..." autocomplete="off">
+            <button id="sendButton" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        // Global variable to store the token
+        let authToken = localStorage.getItem('access_token') || '';
+
+        // Function to register/login and get a token automatically
+        async function autoAuthenticate() {
+            const action = prompt('Welcome! Choose an option:\n1 - Login with existing account\n2 - Register new account\n\nEnter 1 or 2:', '1');
+
+            if (action === '1') {
+                // Login flow
+                const email = prompt('Enter your email:');
+                if (!email) return;
+
+                const password = prompt('Enter your password:');
+                if (!password) return;
+
+                try {
+                    const response = await fetch('http://localhost:8000/api/auth/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ email, password })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        authToken = data.access_token;
+                        localStorage.setItem('access_token', authToken);
+                        addMessage('✅ Logged in successfully! You can now use the chatbot.', false);
+                    } else {
+                        const error = await response.json();
+                        addMessage(`❌ Login failed: ${error.detail}`, false);
+                    }
+                } catch (error) {
+                    addMessage(`❌ Network error during login: ${error.message}`, false);
+                }
+            } else if (action === '2') {
+                // Registration flow
+                const email = prompt('Enter email for new account:');
+                if (!email) return;
+
+                const password = prompt('Enter password:');
+                if (!password) return;
+
+                const firstName = prompt('Enter first name:');
+                if (!firstName) return;
+
+                const lastName = prompt('Enter last name:');
+                if (!lastName) return;
+
+                try {
+                    const response = await fetch('http://localhost:8000/api/auth/register', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            email,
+                            password,
+                            first_name: firstName,
+                            last_name: lastName
+                        })
+                    });
+
+                    if (response.ok) {
+                        // Auto-login after registration
+                        const loginResponse = await fetch('http://localhost:8000/api/auth/login', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ email, password })
+                        });
+
+                        if (loginResponse.ok) {
+                            const data = await loginResponse.json();
+                            authToken = data.access_token;
+                            localStorage.setItem('access_token', authToken);
+                            addMessage('✅ Account created and logged in successfully! You can now use the chatbot.', false);
+                        }
+                    } else {
+                        const error = await response.json();
+                        addMessage(`❌ Registration failed: ${error.detail}`, false);
+                    }
+                } catch (error) {
+                    addMessage(`❌ Network error during registration: ${error.message}`, false);
+                }
+            }
+        }
+
+        // Function to update the token in localStorage
+        function updateToken() {
+            const newToken = prompt('Or enter your authentication token manually (get it from http://localhost:3000 after logging in):\n\nSteps:\n1. Go to http://localhost:3000\n2. Login or register\n3. Press F12 → Application → Local Storage → access_token\n4. Copy the token value and paste here:', authToken);
+            if (newToken !== null && newToken.trim() !== '') {
+                authToken = newToken.trim();
+                localStorage.setItem('access_token', authToken);
+
+                // Verify the token by making a test request
+                testTokenValidity(authToken);
+            } else if (newToken !== null) {
+                alert('Token cannot be empty. Please enter a valid token.');
+            }
+        }
+
+        // Function to test token validity
+        async function testTokenValidity(token) {
+            try {
+                const response = await fetch('http://localhost:8000/api/tasks/', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    addMessage('✅ Token verified successfully. You can now create and manage tasks!', false);
+                    return true;
+                } else {
+                    console.log('Token verification failed');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error verifying token:', error);
+                return false;
+            }
+        }
+
+        // Function to check for token updates from other tabs/windows
+        function checkForTokenUpdates() {
+            // Listen for storage events to sync tokens across tabs
+            window.addEventListener('storage', function(e) {
+                if (e.key === 'access_token') {
+                    if (e.newValue) {
+                        authToken = e.newValue;
+                        addMessage('🔄 Token automatically updated from another tab. You can now use the chatbot!', false);
+                    }
+                }
+            });
+
+            // Periodically check if token has been updated in localStorage
+            setInterval(async function() {
+                const currentToken = localStorage.getItem('access_token');
+                if (currentToken && currentToken !== authToken) {
+                    authToken = currentToken;
+                    if (await testTokenValidity(authToken)) {
+                        addMessage('🔄 Token automatically detected from main application. Ready to use!', false);
+                    }
+                }
+            }, 2000); // Check every 2 seconds
+        }
+
+        // Add token update button to the header
+        window.addEventListener('load', function() {
+            // Initialize token checking
+            checkForTokenUpdates();
+
+            const header = document.querySelector('.chat-header');
+            if (header) {
+                // Create authenticate button
+                const authButton = document.createElement('button');
+                authButton.textContent = 'Login/Register';
+                authButton.title = 'Click to login or register for an account';
+                authButton.style.position = 'absolute';
+                authButton.style.top = '20px';
+                authButton.style.right = '120px'; // Position to the left of sync button
+                authButton.style.backgroundColor = '#2196F3';
+                authButton.style.color = 'white';
+                authButton.style.border = 'none';
+                authButton.style.borderRadius = '5px';
+                authButton.style.padding = '8px 12px';
+                authButton.style.cursor = 'pointer';
+                authButton.style.fontSize = '14px';
+                authButton.onclick = autoAuthenticate;
+
+                // Create sync button
+                const syncButton = document.createElement('button');
+                syncButton.textContent = 'Sync Token';
+                syncButton.title = 'Click to sync your authentication token from the main app';
+                syncButton.style.position = 'absolute';
+                syncButton.style.top = '20px';
+                syncButton.style.right = '20px';
+                syncButton.style.backgroundColor = '#4CAF50';
+                syncButton.style.color = 'white';
+                syncButton.style.border = 'none';
+                syncButton.style.borderRadius = '5px';
+                syncButton.style.padding = '8px 12px';
+                syncButton.style.cursor = 'pointer';
+                syncButton.style.fontSize = '14px';
+
+                syncButton.onclick = updateToken;
+                header.style.position = 'relative';
+                header.appendChild(authButton);
+                header.appendChild(syncButton);
+            }
+
+            // Show token status message with auto-authentication option
+            setTimeout(async () => {
+                if (!authToken) {
+                    addMessage('🔐 Welcome! Please authenticate to use the chatbot.\n\n👆 Click the blue "Login/Register" button above to get started.\nOR\n👆 Click the green "Sync Token" button if you\'re already logged in at http://localhost:3000', false);
+                } else {
+                    // Test if the existing token is still valid
+                    if (await testTokenValidity(authToken)) {
+                        addMessage('✅ Authentication token is set and valid. You can now interact with your tasks.', false);
+                    } else {
+                        addMessage('🔐 Token may be expired. Click "Login/Register" or "Sync Token" to update.', false);
+                    }
+                }
+            }, 1000);
+        });
+
+        // Client-side chatbot that connects to the main API
+        class IntegratedTaskChatbot {
+            constructor() {
+                this.apiUrl = 'http://localhost:8000/api';
+            }
+
+            async processMessage(message) {
+                const lowerMsg = message.toLowerCase().trim();
+
+                // Add task patterns
+                if (lowerMsg.includes('add task:') || lowerMsg.includes('create task') || lowerMsg.includes('i need to ') || lowerMsg.includes('don\'t forget to ')) {
+                    let taskTitle = '';
+
+                    if (lowerMsg.includes('add task:')) {
+                        taskTitle = message.split('add task:')[1]?.trim();
+                    } else if (lowerMsg.includes('create task to ')) {
+                        taskTitle = message.split('create task to ')[1]?.trim();
+                    } else if (lowerMsg.includes('i need to ')) {
+                        taskTitle = message.split('i need to ')[1]?.trim();
+                    } else if (lowerMsg.includes('don\'t forget to ')) {
+                        taskTitle = message.split('don\'t forget to ')[1]?.trim();
+                    }
+
+                    if (taskTitle) {
+                        try {
+                            if (!authToken) {
+                                return '❌ Please set your authentication token first.';
+                            }
+
+                            const response = await fetch(`${this.apiUrl}/tasks`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${authToken}`
+                                },
+                                body: JSON.stringify({
+                                    title: taskTitle,
+                                    description: '',
+                                    type: 'general'
+                                })
+                            });
+
+                            if (response.ok) {
+                                const newTask = await response.json();
+                                const responses = [
+                                    `✅ Great! I've added "${newTask.title}" to your task list.`,
+                                    `📝 Task "${newTask.title}" has been created successfully.`,
+                                    `👍 Added "${newTask.title}" to your list. You got this!`,
+                                    `✔️ Got it! "${newTask.title}" is now on your task list.`
+                                ];
+                                return responses[Math.floor(Math.random() * responses.length)];
+                            } else {
+                                const errorData = await response.json();
+                                return `❌ Failed to add task: ${errorData.detail || response.statusText}`;
+                            }
+                        } catch (error) {
+                            console.error('Error adding task:', error);
+                            return `❌ Error adding task: ${error.message}`;
+                        }
+                    }
+                }
+
+                // Delete task patterns
+                if (lowerMsg.includes('delete task:') || lowerMsg.includes('remove the ') || lowerMsg.includes('cancel the ')) {
+                    let taskName = '';
+
+                    if (lowerMsg.includes('delete task:')) {
+                        taskName = message.split('delete task:')[1]?.trim();
+                    } else if (lowerMsg.includes('remove the ')) {
+                        taskName = message.split('remove the ')[1]?.split(' task')[0]?.trim();
+                    } else if (lowerMsg.includes('cancel the ')) {
+                        taskName = message.split('cancel the ')[1]?.split(' task')[0]?.trim();
+                    }
+
+                    if (taskName) {
+                        try {
+                            if (!authToken) {
+                                return '❌ Please set your authentication token first.';
+                            }
+
+                            // First, get all tasks to find the specific one
+                            const tasksResponse = await fetch(`${this.apiUrl}/tasks`, {
+                                headers: {
+                                    'Authorization': `Bearer ${authToken}`
+                                }
+                            });
+
+                            if (tasksResponse.ok) {
+                                const tasks = await tasksResponse.json();
+                                const taskToDelete = tasks.find(task =>
+                                    task.title.toLowerCase().includes(taskName.toLowerCase())
+                                );
+
+                                if (taskToDelete) {
+                                    const deleteResponse = await fetch(`${this.apiUrl}/tasks/${taskToDelete.id}`, {
+                                        method: 'DELETE',
+                                        headers: {
+                                            'Authorization': `Bearer ${authToken}`
+                                        }
+                                    });
+
+                                    if (deleteResponse.ok) {
+                                        const responses = [
+                                            `🗑️ I've removed "${taskName}" from your task list.`,
+                                            `✅ "${taskName}" has been deleted successfully.`,
+                                            `👋 "${taskName}" is gone from your list.`
+                                        ];
+                                        return responses[Math.floor(Math.random() * responses.length)];
+                                    } else {
+                                        return `❌ Failed to delete task: ${deleteResponse.statusText}`;
+                                    }
+                                } else {
+                                    return `❌ Sorry, I couldn't find a task named "${taskName}" to delete.`;
+                                }
+                            } else {
+                                return `❌ Failed to retrieve tasks: ${tasksResponse.statusText}`;
+                            }
+                        } catch (error) {
+                            console.error('Error deleting task:', error);
+                            return `❌ Error deleting task: ${error.message}`;
+                        }
+                    }
+                }
+
+                // Complete task patterns
+                if (lowerMsg.includes('complete task:') || lowerMsg.includes('i finished ') || lowerMsg.includes('done with ')) {
+                    let taskName = '';
+
+                    if (lowerMsg.includes('complete task:')) {
+                        taskName = message.split('complete task:')[1]?.trim();
+                    } else if (lowerMsg.includes('i finished ')) {
+                        taskName = message.split('i finished ')[1]?.trim();
+                    } else if (lowerMsg.includes('done with ')) {
+                        taskName = message.split('done with ')[1]?.trim();
+                    }
+
+                    if (taskName) {
+                        try {
+                            if (!authToken) {
+                                return '❌ Please set your authentication token first.';
+                            }
+
+                            // First, get all tasks to find the specific one
+                            const tasksResponse = await fetch(`${this.apiUrl}/tasks`, {
+                                headers: {
+                                    'Authorization': `Bearer ${authToken}`
+                                }
+                            });
+
+                            if (tasksResponse.ok) {
+                                const tasks = await tasksResponse.json();
+                                const taskToComplete = tasks.find(task =>
+                                    task.title.toLowerCase().includes(taskName.toLowerCase())
+                                );
+
+                                if (taskToComplete) {
+                                    const completeResponse = await fetch(`${this.apiUrl}/tasks/${taskToComplete.id}/toggle-complete`, {
+                                        method: 'PATCH',
+                                        headers: {
+                                            'Authorization': `Bearer ${authToken}`
+                                        }
+                                    });
+
+                                    if (completeResponse.ok) {
+                                        const completedTask = await completeResponse.json();
+                                        const responses = [
+                                            `🎉 Good job! "${taskName}" has been marked as completed.`,
+                                            `✅ "${taskName}" is now marked as done. Well done!`,
+                                            `👏 Nice! "${taskName}" has been completed.`
+                                        ];
+                                        return responses[Math.floor(Math.random() * responses.length)];
+                                    } else {
+                                        return `❌ Failed to complete task: ${completeResponse.statusText}`;
+                                    }
+                                } else {
+                                    return `❌ I couldn't find a task named "${taskName}" to mark as completed.`;
+                                }
+                            } else {
+                                return `❌ Failed to retrieve tasks: ${tasksResponse.statusText}`;
+                            }
+                        } catch (error) {
+                            console.error('Error completing task:', error);
+                            return `❌ Error completing task: ${error.message}`;
+                        }
+                    }
+                }
+
+                // List tasks patterns
+                if (lowerMsg.includes('show my tasks') || lowerMsg.includes('what\'s on my list') || lowerMsg.includes('list all tasks') || lowerMsg.includes('show me my tasks')) {
+                    try {
+                        if (!authToken) {
+                            return '❌ Please set your authentication token first.';
+                        }
+
+                        const response = await fetch(`${this.apiUrl}/tasks`, {
+                            headers: {
+                                'Authorization': `Bearer ${authToken}`
+                            }
+                        });
+
+                        if (response.ok) {
+                            const tasks = await response.json();
+
+                            if (tasks.length === 0) {
+                                return '📋 Your task list is empty. Would you like to add some tasks?';
+                            }
+
+                            let responseText = `📋 Here are your tasks (${tasks.length} total):\n\n`;
+                            tasks.forEach((task, index) => {
+                                const status = task.completed ? '✅' : '⏳';
+                                responseText += `${index + 1}. ${status} ${task.title}\n`;
+                                if (task.description) {
+                                    responseText += `   ${task.description}\n`;
+                                }
+                                responseText += '\n';
+                            });
+
+                            return responseText;
+                        } else {
+                            return `❌ Failed to retrieve tasks: ${response.statusText}`;
+                        }
+                    } catch (error) {
+                        console.error('Error listing tasks:', error);
+                        return `❌ Error retrieving tasks: ${error.message}`;
+                    }
+                }
+
+                // Help pattern
+                if (lowerMsg.includes('help') || lowerMsg.includes('what can you do')) {
+                    return `🤖 Hello! I'm your task management assistant. Here's what I can do:
+
+📝 **Add tasks**:
+  - "Add task: Buy groceries"
+  - "Create a task to finish report"
+  - "I need to call mom"
+
+🗑️ **Delete tasks**:
+  - "Delete task: Buy groceries"
+  - "Remove the milk task"
+  - "Cancel the meeting task"
+
+✅ **Complete tasks**:
+  - "Complete task: Buy groceries"
+  - "I finished the report"
+  - "Done with shopping"
+
+📋 **View tasks**:
+  - "Show my tasks"
+  - "What's on my list?"
+  - "List all tasks"
+
+💡 **Get help**: Just type "help" anytime!`;
+                }
+
+                return `🤔 I'm not sure what you mean by "${message}". Could you try rephrasing? Try commands like "Add task: Buy groceries" or "Show my tasks".`;
+            }
+        }
+
+        const chatbot = new IntegratedTaskChatbot();
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const typingIndicator = document.getElementById('typingIndicator');
+
+        function addMessage(text, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+            messageDiv.textContent = text;
+            chatMessages.appendChild(messageDiv);
+
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            addMessage(message, true);
+            messageInput.value = '';
+
+            // Show typing indicator
+            typingIndicator.style.display = 'block';
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            try {
+                // Check if token exists
+                if (!authToken) {
+                    addMessage('❌ Please set your authentication token first.', false);
+                    return;
+                }
+
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message, token: authToken })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: response.statusText }));
+
+                    // Check if it's a token-related error
+                    if (response.status === 401 || errorData.error.includes('credentials') || errorData.error.includes('authentication')) {
+                        addMessage(`⚠️ ${errorData.error}. Your token may have expired. Please update your token by clicking the "Update Token" button.`, false);
+                    } else {
+                        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                    }
+                } else {
+                    const data = await response.json();
+                    addMessage(data.response, false);
+                }
+            } catch (error) {
+                if (!error.message.includes('credentials') && !error.message.includes('authentication')) {
+                    addMessage(`❌ Error: ${error.message}`, false);
+                }
+            } finally {
+                typingIndicator.style.display = 'none';
+                messageInput.focus();
+            }
+        }
+
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Add welcome message
+        setTimeout(() => {
+            addMessage(`🤖 Hello! I'm your integrated task management assistant.\n\n✅ I've simplified the interface for you! I already have your authentication token set up.\n\n💡 You can now use commands like "Add task: Buy groceries" or "Show my tasks" directly.`, false);
+        }, 500);
+
+        messageInput.focus();
+    </script>
+</body>
+</html>

@@ -31,7 +31,12 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- Spec-Driven Development: All implementation must strictly follow specs under /specs
+- Full-Stack Implementation: Backend and frontend must be implemented together when required
+- Security-First Architecture: Every API request must require JWT; JWT must be validated in FastAPI; Users can ONLY access their own data
+- Tech Stack Adherence: Must use Next.js 16+ App Router (Frontend), Python FastAPI (Backend), SQLModel (ORM), Neon Serverless PostgreSQL (Database), Better Auth (Authentication)
+- Monorepo Structure: All components must coexist in one repository with proper separation of concerns
+- Authentication Enforcement: REST API secured with JWT; Better Auth for frontend authentication; JWT verification in backend
 
 ## Project Structure
 
