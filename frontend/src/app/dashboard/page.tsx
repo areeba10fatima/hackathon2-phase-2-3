@@ -12,7 +12,7 @@ const DashboardPage: React.FC = () => {
   const [newTaskType, setNewTaskType] = useState('general');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [tasks, setTasks] = useState([]);
+  const [tasks, setTasks] = useState<any[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
 
   const handleLogout = () => {
@@ -33,10 +33,10 @@ const DashboardPage: React.FC = () => {
 
         const data = await apiClient.getTasks();
         setTasks(data);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error fetching tasks:', err);
         // Redirect to login if unauthorized
-        if (err.response?.status === 401) {
+        if (err && typeof err === 'object' && err.response?.status === 401) {
           router.push('/login');
         }
       } finally {
@@ -269,7 +269,7 @@ const DashboardPage: React.FC = () => {
                               setTasks(prevTasks =>
                                 prevTasks.map(t => t.id === task.id ? updatedTask : t)
                               );
-                            } catch (error) {
+                            } catch (error: any) {
                               console.error('Error toggling task completion:', error);
                               setError('Failed to update task status');
                             }
@@ -292,7 +292,7 @@ const DashboardPage: React.FC = () => {
                                 setTasks(prevTasks =>
                                   prevTasks.filter(t => t.id !== task.id)
                                 );
-                              } catch (error) {
+                              } catch (error: any) {
                                 console.error('Error deleting task:', error);
                                 setError('Failed to delete task');
                               }
