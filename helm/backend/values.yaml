@@ -1,0 +1,41 @@
+# Default values for todo-backend
+replicaCount: 1
+
+image:
+  repository: todo-backend
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+service:
+  type: ClusterIP
+  port: 80
+
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "250m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+
+secrets:
+  database_url: <base64-encoded-database-url>
+  better_auth_secret: <base64-encoded-auth-secret>
+  openai_api_key: <base64-encoded-openai-key>
+  jwt_secret: <base64-encoded-jwt-secret>
+
+config:
+  python_env: "production"
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

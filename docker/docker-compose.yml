@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.frontend
+    ports:
+      - "5000:3000"  # Map host port 5000 to container port 3000
+    environment:
+      - NEXT_PUBLIC_BACKEND_URL=http://backend:8000  # Use service name for internal communication
+      - NODE_ENV=production
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.backend
+    ports:
+      - "8443:8000"  # Map host port 8443 to container port 8000
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - PYTHON_ENV=production
+    restart: unless-stopped
